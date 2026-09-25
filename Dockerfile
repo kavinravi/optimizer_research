@@ -10,11 +10,12 @@ COPY requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt \
     && python -m pip check \
     && python -m pip freeze > /app/environment.txt
-COPY benchmark_models.py hardware_benchmark.py ./
+COPY *.py study.json ./
+COPY tokenizer/ ./tokenizer/
 RUN python -c "from mamba_ssm.modules.mamba2 import Mamba2; import causal_conv1d" \
-    && python hardware_benchmark.py --self-test
+    && CUDA_VISIBLE_DEVICES='' python test_training.py
 # An arbitrary host UID need not have a passwd entry in the image. PyTorch's
 # cache setup uses getpass.getuser(), which can resolve this environment name.
 ENV USER=researcher
 # Starting a container without arguments only runs the CPU self-check.
-CMD ["python", "hardware_benchmark.py", "--self-test"]
+CMD ["python", "study.py", "--help"]

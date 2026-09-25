@@ -13,7 +13,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from benchmark_models import GPT, Mamba2LM
+from models import GPT, Mamba2LM
 from pytorch_opt import KFAC, Muon, Shampoo, SOAP, matrix_param_groups, ops
 
 SIZES = {"150m": (768, 16, 30), "300m": (1024, 20, 38)}
@@ -80,7 +80,7 @@ def metadata():
                 cuda=torch.version.cuda, packages=packages, nvidia_smi=smi.stdout.strip(),
                 optimizer_source_sha256=digest.hexdigest(),
                 benchmark_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                models_sha256=hashlib.sha256(Path(__file__).with_name("benchmark_models.py").read_bytes()).hexdigest())
+                models_sha256=hashlib.sha256(Path(__file__).with_name("models.py").read_bytes()).hexdigest())
 
 
 def run_case(args):

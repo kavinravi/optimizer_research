@@ -1,7 +1,7 @@
-"""Model definitions copied from SLM training notebooks for hardware profiling.
+"""Parameter-matched Transformer and Mamba-2 models for training from scratch.
 
-Uses smaller provisional study sizes; does not load summer checkpoints.
-Mamba projections use the module-visible path for every optimizer.
+Adapted from the summer SLM notebooks. Mamba projections execute module hooks
+for every optimizer, including the AdamW control.
 """
 import math
 
@@ -9,6 +9,19 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint
+
+SIZES = {"150m": (768, 16, 30), "300m": (1024, 20, 38)}
+
+
+def model_for(arch, size, sequence, tiny=False, *, vocab_size=50000, checkpointing=True):
+    if arch not in ("transformer", "mamba") or size not in SIZES:
+        raise ValueError("Use transformer/mamba and 150m/300m")
+    width, transformer_layers, mamba_layers = (64, 1, 1) if tiny else SIZES[size]
+    if arch == "transformer":
+        return GPT(vocab_size, width, width // 64, transformer_layers, 4 * width,
+                   sequence, 0.0, checkpointing)
+    return Mamba2LM(vocab_size, width, mamba_layers, 16 if tiny else 128,
+                    16 if tiny else 64, 2, 4, 16 if tiny else 256, checkpointing)
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, d_model, n_heads, dropout):

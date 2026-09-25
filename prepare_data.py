@@ -173,9 +173,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default="data/fineweb-edu-512m")
     parser.add_argument("--tokenizer", default=str(Path(__file__).parent / "tokenizer/tokenizer.json"))
-    parser.add_argument("--train-tokens", type=int, default=536870912)
-    parser.add_argument("--val-tokens", type=int, default=1048576)
-    parser.add_argument("--test-tokens", type=int, default=1048576)
+    # One extra token supplies the target at the end of the last packed block.
+    parser.add_argument("--train-tokens", type=int, default=536870913)
+    parser.add_argument("--val-tokens", type=int, default=1048577)
+    parser.add_argument("--test-tokens", type=int, default=1048577)
     parser.add_argument("--revision", default=REVISION)
     parser.add_argument("--verify", action="store_true")
     args = parser.parse_args()

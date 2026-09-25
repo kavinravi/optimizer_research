@@ -1,5 +1,7 @@
 *
 !Dockerfile
 !requirements.txt
-!benchmark_models.py
-!hardware_benchmark.py
+!*.py
+!study.json
+!tokenizer/
+!tokenizer/**

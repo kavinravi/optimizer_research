@@ -1,0 +1,53 @@
+{
+  "data": "data/fineweb-edu-512m",
+  "architectures": ["transformer", "mamba"],
+  "sizes": ["150m", "300m"],
+  "optimizers": ["adamw", "muon", "shampoo", "kfac"],
+  "training": {
+    "sequence": 2048,
+    "micro_batch": 1,
+    "accumulation": 16,
+    "weight_decay": 0.1,
+    "min_lr_ratio": 0.1,
+    "refresh": 10,
+    "damping": 0.001,
+    "selection": "all",
+    "eval_every": 64,
+    "eval_tokens": 262144,
+    "checkpoint_every": 64,
+    "log_every": 10,
+    "precision": "bf16",
+    "device": "cuda",
+    "checkpointing": true,
+    "allow_repeated_data": false
+  },
+  "pilot": {
+    "tokens": 33554432,
+    "seeds": [3619],
+    "learning_rates": {
+      "adamw": {"transformer": 0.0003, "mamba": 0.001},
+      "muon": 0.02,
+      "shampoo": 0.01,
+      "kfac": 0.003,
+      "soap": 0.001
+    }
+  },
+  "tuning": {
+    "tokens": 268435456,
+    "seeds": [3619, 1337],
+    "learning_rates": {
+      "adamw": {
+        "transformer": [0.0001, 0.0003, 0.001, 0.003],
+        "mamba": [0.0003, 0.001, 0.003, 0.006]
+      },
+      "muon": [0.005, 0.01, 0.02, 0.04],
+      "shampoo": [0.001, 0.003, 0.01, 0.03],
+      "kfac": [0.0003, 0.001, 0.003, 0.01],
+      "soap": [0.0001, 0.0003, 0.001, 0.003]
+    }
+  },
+  "final": {"tokens": null, "seeds": [101, 202, 303]},
+  "warmup_fraction": 0.03,
+  "minimum_warmup_steps": 2,
+  "plan_seed": 3619
+}
