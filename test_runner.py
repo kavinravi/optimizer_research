@@ -3,8 +3,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import tempfile
+import time
 
 
 def main():
@@ -42,6 +44,8 @@ print('{}')
                              env=env, capture_output=True, text=True)
         assert bad.returncode == 2
     check_training_launcher()
+    if shutil.which("tmux"):
+        check_tmux_interrupt()
     print("Runner check passed: one selected GPU, bounded runtime, cleanup and exit status.")
 
 
@@ -84,6 +88,54 @@ if args[0] == 'new-session':
         result = subprocess.run(["bash", str(root / "launch_study.sh"), "plan with spaces.json", "GPU-test"],
                                 env=dict(env, TEST_EXISTING_SESSION="1"), capture_output=True, text=True)
         assert result.returncode == 2 and 'already exists' in result.stderr
+
+
+def check_tmux_interrupt():
+    """Exercise a real terminal interrupt without touching the user's tmux server."""
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        shutil.copy(Path(__file__).with_name("launch_study.sh"), root)
+        (root / ".venv/bin").mkdir(parents=True)
+        (root / "bin").mkdir()
+        tmux = [shutil.which("tmux"), "-S", str(root / "tmux.sock")]
+        wrapper = root / "bin/tmux"
+        wrapper.write_text('#!/bin/sh\nexec ' + shlex.join(tmux) + ' "$@"\n')
+        python = root / ".venv/bin/python"
+        python.write_text("""#!/usr/bin/env python3
+from pathlib import Path
+import signal, sys, time
+if sys.argv[1] == '-':
+    sys.stdin.read()
+    sys.exit(0)
+stopped = False
+def stop(signum, frame):
+    global stopped
+    stopped = True
+signal.signal(signal.SIGINT, stop)
+Path('ready').touch()
+while not stopped:
+    time.sleep(.05)
+print('STOP SAVED', flush=True)
+""")
+        for path in (wrapper, python):
+            path.chmod(0o755)
+        (root / "plan.json").write_text('{}')
+        env = dict(os.environ, PATH=str(root / 'bin') + os.pathsep + os.environ['PATH'])
+        try:
+            launched = subprocess.run(['bash', str(root / 'launch_study.sh'), 'plan.json', 'GPU-test'],
+                                      env=env, capture_output=True, text=True, timeout=15)
+            assert launched.returncode == 0, launched.stderr
+            deadline = time.monotonic() + 10
+            while not (root / 'ready').exists() and time.monotonic() < deadline:
+                time.sleep(.05)
+            assert (root / 'ready').exists(), launched.stdout
+            subprocess.run(tmux + ['send-keys', '-t', 'optimizer-training:0.0', 'C-c'], check=True)
+            while not (root / 'results/queue.exit').exists() and time.monotonic() < deadline:
+                time.sleep(.05)
+            assert (root / 'results/queue.exit').read_text().strip() == '0'
+            assert 'STOP SAVED' in (root / 'results/queue.log').read_text()
+        finally:
+            subprocess.run(tmux + ['kill-server'], capture_output=True)
 
 
 if __name__ == "__main__":
