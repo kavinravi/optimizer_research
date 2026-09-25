@@ -219,9 +219,10 @@ comparison. It is not silently substituted for the primary all-linear policy.
   sampled-Fisher work, optimizer updates and refresh steps, with GPU
   synchronization. It excludes validation and checkpoint I/O. First-use JIT
   compilation during an update remains included; no warmup steps disappear.
-- `wall_seconds` measures cumulative active process elapsed time, including
+- `wall_seconds` measures cumulative elapsed time inside the trainer, including
   setup, evaluation, checkpointing and resume setup. It excludes time between
-  stopped processes. Reports plot both clocks as well as tokens.
+  stopped processes and imports before entering the trainer. Queue attempt
+  durations include that process startup. Reports plot both clocks and tokens.
 
 A crash can lose work since the last commit. Resume rolls metrics back to the
 committed state and keeps discarded rows separately. Queue attempt logs retain
@@ -303,6 +304,8 @@ Docker permission is currently unavailable to this ml2 account and is not
 needed. The native environment uses scratch caches without changing `HOME`.
 The `_POSIX_C_SOURCE` redefinition printed by Triton's host compilation is a
 warning; the exit code and trainer tests determine whether compilation worked.
+The [verification record](VERIFICATION.md) lists the completed checks and the
+prepared ml2 data/plan identifiers.
 
 ## Research context
 

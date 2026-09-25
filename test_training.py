@@ -236,6 +236,30 @@ class TrainingTests(unittest.TestCase):
         rows = [json.loads(s) for s in (output / "metrics.jsonl").read_text().splitlines()]
         self.assertEqual(sum(r["kind"] == "test" for r in rows), 1)
 
+    def test_tuning_and_final_plans_freeze_fallback_and_repeat_seeds(self):
+        spec = json.loads(Path(__file__).with_name("study.json").read_text())
+        spec["training"].update(sequence=8, micro_batch=1, accumulation=2, eval_tokens=64)
+        args = dict(architectures=["transformer"], sizes=["150m"], tokens=96)
+        baseline = make_plan(spec, "tune-adamw", self.data, **args)
+        selection = dict(data_id=baseline["data_id"], sources=baseline["sources"], winners={
+            "transformer/150m/adamw": dict(lr=.001, fallback_lr=.001, tokens=96, seeds=[3619, 1337])})
+        advanced = make_plan(spec, "tune-others", self.data, selections=selection, **args)
+        self.assertEqual(len(advanced["trials"]), 3 * len(baseline["trials"]))
+        self.assertEqual({t["config"]["fallback_lr"] for t in advanced["trials"]}, {.001})
+        for optimizer in ("muon", "shampoo", "kfac"):
+            selection["winners"][f"transformer/150m/{optimizer}"] = dict(
+                lr=.003, fallback_lr=.001, tokens=96, seeds=[3619, 1337])
+        final = make_plan(spec, "final", self.data, selections=selection, **args)
+        self.assertEqual(len(final["trials"]), 12)
+        self.assertTrue(all(t["config"]["evaluate_test"] for t in final["trials"]))
+        for phase, changes in (("tune-others", dict(tokens=112)), ("final", dict(seeds=[3619, 101])),
+                               ("final", dict(tokens=8192))):
+            with self.assertRaises(ValueError):
+                make_plan(spec, phase, self.data, selections=selection, **(args | changes))
+        final["trials"][0]["config"]["total_tokens"] = 112
+        with self.assertRaisesRegex(ValueError, "fingerprint"):
+            check_plan(final)
+
     @unittest.skipUnless(GPU, "Pass --gpu for CUDA/Mamba integration checks")
     def test_gpu_resume_all_architectures_and_optimizers(self):
         self.assertTrue(torch.cuda.is_available())

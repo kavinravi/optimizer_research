@@ -119,7 +119,7 @@ def report(results, output, target=None, plots=True):
                         axis.plot([p[field] / scale for p in points], [p["loss"] for p in points],
                                   color=color, alpha=.65, linewidth=1,
                                   label=f"{arm} s{points[0]['seed']}")
-            for axis, label in zip(axes, ("Training tokens (millions)", "Training hours", "Active elapsed hours")):
+            for axis, label in zip(axes, ("Training tokens (millions)", "Training hours", "Active trainer hours")):
                 axis.set(xlabel=label, ylabel="Validation cross-entropy (nats/token)")
                 axis.grid(alpha=.2)
                 if target is not None:
@@ -127,7 +127,7 @@ def report(results, output, target=None, plots=True):
             if arms:
                 axes[-1].legend(fontsize=6)
             p = info["protocol"]
-            figure.suptitle(f"{p['architecture']} {p['size']} {p['phase']} | "
+            figure.suptitle(f"{p['architecture']} {'tiny' if p['tiny'] else p['size']} {p['phase']} | "
                            f"{info['hardware'].get('name') or info['hardware']['device']} | {group}")
             figure.savefig(output / f"{group}.png", dpi=160)
             figure.savefig(output / f"{group}.pdf")
