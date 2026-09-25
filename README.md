@@ -141,7 +141,7 @@ Each case warms up for ten steps and measures thirty more, including three
 matrix-refresh cycles. The average includes expensive refresh steps. The
 fixed learning rate is for throughput screening only, not the main study's
 learning-rate comparison. The benchmark excludes data loading, validation
-and checkpoint I/O, and uses synthetic tokens with a provisional 50,000-word
+and checkpoint I/O, and uses synthetic tokens with a provisional 50,000-token
 vocabulary rather than loading the study tokenizer.
 
 ## Environment and verification
@@ -151,8 +151,17 @@ upstream binary wheels for Mamba 2.3.2.post1 and causal-conv1d 1.7.0. These
 extensions' release builds include Blackwell support. No CUDA compilation
 is needed during setup. The host still supplies the GPU driver.
 
-Local verification status will be recorded here after the build and checks.
-ml2 access and its installed runtime have not yet been verified.
+Verified September 25, 2026: the image builds, package consistency and CPU
+checks pass, and all eight tiny GPU cases pass inside the container on an
+RTX 5090, including Mamba-2 with sampled-Fisher K-FAC. The runner's GPU
+selection, cleanup, and failure exit status also pass their local check.
+The full-size benchmark, ml2 login, and ml2's installed runtime have not yet
+been verified. No FineWeb-Edu training has started.
+
+The base image and main dependencies are pinned. Transitive package versions
+are captured in `/app/environment.txt` and copied into each results directory.
+Reuse the same built image for controlled comparisons; a fresh build can
+resolve newer transitive dependencies and must be checked again.
 
 Checks that do not need a GPU:
 
