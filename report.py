@@ -3,8 +3,10 @@ import argparse
 import csv
 import json
 import math
+import os
 from pathlib import Path
 import statistics
+import tempfile
 
 from artifacts import atomic_json, fingerprint
 
@@ -99,6 +101,8 @@ def report(results, output, target=None, plots=True):
     write_csv(output / "summary.csv", summaries)
     atomic_json(output / "comparisons.json", comparisons)
     if plots:
+        os.environ.setdefault("MPLCONFIGDIR", str(Path(os.environ.get("XDG_CACHE_HOME", tempfile.gettempdir())) /
+                                                 f"matplotlib-{os.getuid()}"))
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt

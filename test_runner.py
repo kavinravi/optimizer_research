@@ -41,7 +41,49 @@ print('{}')
         bad = subprocess.run(["bash", str(root / "run_ml2.sh"), "all"],
                              env=env, capture_output=True, text=True)
         assert bad.returncode == 2
+    check_training_launcher()
     print("Runner check passed: one selected GPU, bounded runtime, cleanup and exit status.")
+
+
+def check_training_launcher():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        shutil.copy(Path(__file__).with_name("launch_study.sh"), root)
+        (root / ".venv/bin").mkdir(parents=True)
+        binaries = root / "bin"
+        binaries.mkdir()
+        (root / ".venv/bin/python").write_text("""#!/usr/bin/env python3
+import json, sys
+if sys.argv[1] == '-':
+    sys.stdin.read()
+else:
+    open('arguments.json', 'w').write(json.dumps(sys.argv[1:]))
+    print('controlled queue failure')
+    sys.exit(7)
+""")
+        (binaries / "tmux").write_text("""#!/usr/bin/env python3
+import os, subprocess, sys
+args = sys.argv[1:]
+if args[0] == 'has-session':
+    sys.exit(0 if os.environ.get('TEST_EXISTING_SESSION') else 1)
+if args[0] == 'new-session':
+    subprocess.run(args[args.index('bash'):])
+""")
+        for binary in (root / ".venv/bin/python", binaries / "tmux"):
+            binary.chmod(0o755)
+        (root / "plan with spaces.json").write_text('{}')
+        env = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ["PATH"], STUDY_HOURS="0.5")
+        result = subprocess.run(["bash", str(root / "launch_study.sh"), "plan with spaces.json", "GPU-test"],
+                                env=env, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        args = json.loads((root / "arguments.json").read_text())
+        assert args[args.index('--plan') + 1] == 'plan with spaces.json'
+        assert args[args.index('--gpus') + 1] == 'GPU-test'
+        assert args[args.index('--hours') + 1] == '0.5'
+        assert (root / 'results/queue.exit').read_text().strip() == '7'
+        result = subprocess.run(["bash", str(root / "launch_study.sh"), "plan with spaces.json", "GPU-test"],
+                                env=dict(env, TEST_EXISTING_SESSION="1"), capture_output=True, text=True)
+        assert result.returncode == 2 and 'already exists' in result.stderr
 
 
 if __name__ == "__main__":

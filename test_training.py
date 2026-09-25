@@ -3,7 +3,6 @@ from dataclasses import asdict, replace
 import json
 from pathlib import Path
 import tempfile
-import subprocess
 import unittest
 from unittest.mock import patch
 import sys
@@ -217,6 +216,25 @@ class TrainingTests(unittest.TestCase):
         train(config, self.data, path, resume=True)
         self.assertNotIn("999999", (path / "metrics.jsonl").read_text())
         self.assertEqual(len(list(path.glob("discarded-*.jsonl"))), 1)
+
+    def test_final_checkpoint_recovers_without_repeating_test(self):
+        config = replace(self.config(), tiny=False, phase="final", evaluate_test=True)
+        output = self.root / "final-recovery"
+        original_factory = model_for
+
+        def small_factory(arch, size, sequence, tiny, **kwargs):
+            return original_factory(arch, size, sequence, True, **kwargs)
+
+        # Exercise the final-run path with the small fixture, then simulate loss
+        # of status.json after the final checkpoint was committed.
+        with patch("train.DATASET", "local-fixture"), patch("train.model_for", small_factory):
+            train(config, self.data, output)
+            (output / "status.json").unlink()
+            with patch("train.evaluate", side_effect=AssertionError("Final evaluation was already committed")):
+                recovered = train(config, self.data, output, resume=True)
+        self.assertIsNotNone(recovered["test_loss"])
+        rows = [json.loads(s) for s in (output / "metrics.jsonl").read_text().splitlines()]
+        self.assertEqual(sum(r["kind"] == "test" for r in rows), 1)
 
     @unittest.skipUnless(GPU, "Pass --gpu for CUDA/Mamba integration checks")
     def test_gpu_resume_all_architectures_and_optimizers(self):

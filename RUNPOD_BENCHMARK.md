@@ -19,7 +19,7 @@ This measures one GPU at a time, not eight-GPU DGX scaling or campus contention.
 ## 1. Prepare the files before renting
 
 The archive `runpod-hardware-benchmark.tar.gz` contains this guide,
-`hardware_benchmark.py`, `benchmark_models.py`, and `setup_runpod.sh`.
+`hardware_benchmark.py`, `models.py`, and `setup_runpod.sh`.
 No dataset or checkpoint download is needed. The benchmark uses synthetic
 token sequences to measure compute throughput, not loss convergence.
 

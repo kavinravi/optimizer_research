@@ -25,9 +25,10 @@ for gpu in sys.argv[2:]:
     ensure_free_gpu(gpu)
 PY
 mkdir -p results
+rm -f results/queue.exit
 printf -v job '%q ' .venv/bin/python -u study.py run --plan "$plan" --gpus "$@" --hours "${STUDY_HOURS:-8}"
 job="set -o pipefail; $job 2>&1 | tee -a results/queue.log; code=\${PIPESTATUS[0]}; printf '%s\\n' \"\$code\" > results/queue.exit; exit \"\$code\""
 tmux new-session -d -s optimizer-training -c "$PWD" bash -c "$job"
 tmux set-option -t optimizer-training prefix C-a
 tmux set-option -t optimizer-training mouse on
-printf 'Started on this server. Attach: tmux attach -t optimizer-training\nDetach: Ctrl+A, then D. Stop and save: Ctrl+C inside the session.\nQueue log: %s/results/queue.log\n' "$PWD"
+printf 'Started on this server. Attach: tmux attach -t optimizer-training\nDetach: Ctrl+A, then d. Stop and save: Ctrl+C inside the session.\nQueue log: %s/results/queue.log\n' "$PWD"

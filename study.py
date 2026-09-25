@@ -72,6 +72,10 @@ def make_plan(spec, phase, data, *, architectures=None, sizes=None, tokens=None,
             baseline_key = arm_key(architecture, size, "adamw")
             if phase in ("tune-others", "final"):
                 fallback = selections["winners"][baseline_key]["lr"]
+                if phase == "tune-others":
+                    baseline = selections["winners"][baseline_key]
+                    if baseline["tokens"] != budget or set(baseline["seeds"]) != set(seeds):
+                        raise ValueError("Advanced optimizer tuning must match the AdamW token budget and seeds")
             else:
                 fallback = rate_for(spec["pilot"]["learning_rates"], "adamw", architecture)
             for optimizer in chosen:

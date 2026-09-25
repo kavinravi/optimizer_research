@@ -322,7 +322,7 @@ def _train(config, data, output, resume, stop_after_steps, max_seconds):
                                        refresh=config.refresh, selection=config.selection, damping=config.damping)
     fisher_rng = torch.Generator(device=device).manual_seed(config.seed + 104729)
     counters = dict(step=0, tokens=0, train_seconds=0.0, eval_seconds=0.0,
-                    checkpoint_seconds=0.0, best_val_loss=None, last_eval_step=-1)
+                    checkpoint_seconds=0.0, best_val_loss=None, last_eval_step=-1, test_loss=None)
     wall_base = 0.0
     checkpoint_step = -1
     metrics_path = output / "metrics.jsonl"
@@ -397,6 +397,8 @@ def _train(config, data, output, resume, stop_after_steps, max_seconds):
             counters["last_eval_step"] = counters["step"]
             best = counters["best_val_loss"]
             counters["best_val_loss"] = value if best is None else min(best, value)
+        else:
+            counters["test_loss"] = value
         metric(split, loss=value, eval_tokens=config.eval_tokens, eval_seconds=elapsed)
         print(f"{split} step={counters['step']} tokens={counters['tokens']:,} loss={value:.5f} "
               f"train_seconds={counters['train_seconds']:.1f}", flush=True)
@@ -499,13 +501,11 @@ def _train(config, data, output, resume, stop_after_steps, max_seconds):
         complete = counters["tokens"] == config.total_tokens
         if complete and counters["last_eval_step"] != counters["step"]:
             validate()
-        test_loss = None
-        if complete and config.evaluate_test:
-            # A completed run is handled before re-entering this function by the queue.
-            test_loss = validate("test")
+        if complete and config.evaluate_test and counters["test_loss"] is None:
+            validate("test")
         save_checkpoint()
         status = dict(status="complete" if complete else "paused", **counters,
-                      wall_seconds=wall_seconds(), test_loss=test_loss, config_id=config_id,
+                      wall_seconds=wall_seconds(), config_id=config_id,
                       data_id=manifest["data_id"])
         atomic_json(output / "status.json", status)
         print(f"{status['status'].upper()}: {output}", flush=True)
