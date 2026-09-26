@@ -20,6 +20,15 @@ Connect to the Chapman VPN if campus Wi-Fi cannot resolve the server. Run:
 ssh kravi@ml2.chapman.edu
 ```
 
+If that name temporarily fails to resolve but campus/VPN routing still works,
+the previously verified address can be used while retaining the hostname's
+saved SSH host key:
+
+```bash
+ssh -o HostName=10.20.157.231 -o HostKeyAlias=ml2.chapman.edu \
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 kravi@ml2.chapman.edu
+```
+
 Then, on **ml2**, use the existing installation:
 
 ```bash
@@ -32,6 +41,8 @@ nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name --format=csv
 The native Python environment works without Docker or a home directory.
 Nothing needs to run on the laptop except SSH. The study files and processes
 remain on ml2 when the desktop or laptop disconnects.
+The launcher sources `../env.sh` inside the detached tmux pane too, because
+an existing tmux server does not inherit newly exported cache settings.
 
 For the prepared pilot plan, choose **two currently free** GPUs. These are
 ml2's GPU 0 and GPU 1 UUIDs; verify they are still free before using them:
@@ -254,13 +265,15 @@ A paused run resumes automatically through the same queue command. For a
 failed run, inspect its `stderr.log` first, then explicitly retry through:
 
 ```bash
-.venv/bin/python study.py run --plan results/plans/pilot.json \
-  --gpus GPU-REPLACE-WITH-FREE-UUID --hours 4 --retry-failed
+STUDY_HOURS=4 bash launch_study.sh --retry-failed results/plans/pilot.json \
+  GPU-REPLACE-WITH-FREE-UUID
 ```
 
-Use tmux if starting this command manually. Retry resumes the last committed
-checkpoint. Failure before the first checkpoint requires a fresh run directory;
-move the failed directory aside to preserve diagnostics. For physical damage
+This uses the same detached tmux launcher. Retry resumes the last committed
+checkpoint and skips completed trials. An import failure before `config.json`
+was written can retry in place, preserving its logs. If `config.json` exists
+but no checkpoint was committed, move that failed directory aside to preserve
+diagnostics before retrying from scratch. For physical damage
 to the latest checkpoint, stop the queue and preserve the damaged files before
 replacing `latest.json` with `previous.json`, then retry. Checkpoints are trusted
 local PyTorch artifacts; do not load downloaded third-party pickle files.

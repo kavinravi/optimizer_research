@@ -1,5 +1,15 @@
 # Verification on September 25, 2026
 
+September 26 correction: the first pilot launch completed all eight Transformer
+runs, but all eight Mamba runs failed during import. The persistent tmux server
+had started before the scratch cache variables were exported, so Mamba's
+TileLang dependency tried to create its cache under the missing home directory.
+The earlier GPU checks explicitly sourced the environment inside their jobs;
+they did not exercise this launcher failure. The launcher now sources the
+environment inside its detached pane, and the regression test starts tmux
+without the cache variable before invoking the launcher. `--retry-failed`
+retries those imports in place and retains the completed Transformer runs.
+
 The ml2 installation uses Python 3.12.12, PyTorch 2.10.0+cu128, Mamba
 2.3.2.post1 and the pinned optimizer commit in `requirements.txt`. GPU checks
 ran on one RTX PRO 6000 Blackwell Server Edition, 96 GB, with driver 595.84.

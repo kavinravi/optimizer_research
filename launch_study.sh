@@ -3,8 +3,13 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")"
 if [[ -f ../env.sh ]]; then source ../env.sh; fi
+retry_args=()
+if [[ ${1:-} == --retry-failed ]]; then
+  retry_args=(--retry-failed)
+  shift
+fi
 if (( $# < 2 || $# > 3 )); then
-  echo 'Usage: bash launch_study.sh PLAN.json GPU-UUID [GPU-UUID]' >&2
+  echo 'Usage: bash launch_study.sh [--retry-failed] PLAN.json GPU-UUID [GPU-UUID]' >&2
   exit 2
 fi
 plan=$1
@@ -26,8 +31,10 @@ for gpu in sys.argv[2:]:
 PY
 mkdir -p results
 rm -f results/queue.exit
-printf -v job '%q ' .venv/bin/python -u study.py run --plan "$plan" --gpus "$@" --hours "${STUDY_HOURS:-8}"
-job="set -o pipefail; $job 2>&1 | tee -i -a results/queue.log; code=\${PIPESTATUS[0]}; printf '%s\\n' \"\$code\" > results/queue.exit; exit \"\$code\""
+printf -v job '%q ' .venv/bin/python -u study.py run --plan "$plan" --gpus "$@" --hours "${STUDY_HOURS:-8}" "${retry_args[@]}"
+# A persistent tmux server keeps its original environment. Load scratch cache
+# paths in the new pane as well as in this shell before importing Mamba.
+job="set -o pipefail; if [[ -f ../env.sh ]]; then source ../env.sh || exit; fi; $job 2>&1 | tee -i -a results/queue.log; code=\${PIPESTATUS[0]}; printf '%s\\n' \"\$code\" > results/queue.exit; exit \"\$code\""
 tmux new-session -d -s optimizer-training -c "$PWD" bash -c "$job"
 tmux set-option -t optimizer-training prefix C-a
 tmux set-option -t optimizer-training mouse on
