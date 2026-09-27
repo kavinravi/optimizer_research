@@ -6,7 +6,7 @@ import tempfile
 from unittest.mock import patch
 
 from artifacts import atomic_json, fingerprint
-from calibration import (boundary_arms, candidate_key, candidates, finish_report,
+from calibration import (boundary_arms, calibrate, candidates, finish_report,
                          make_calibration_plan, prune_checkpoints, ranked)
 from optimizers import optimizer_for
 from study import check_plan
@@ -93,6 +93,48 @@ def main():
         assert not (negative/'final-plan.json').exists()
         assert json.loads((positive/'main-study-readiness.json').read_text())['main_ready']
         assert not json.loads((negative/'main-study-readiness.json').read_text())['main_ready']
+        # Exercise the entire staged controller with recorded trainer outputs.
+        # Actual training/resume is checked below; no GPU is needed for orchestration.
+        calls = []
+        def recorded_run(plan_path, outputs, gpus, **kwargs):
+            p = json.loads(Path(plan_path).read_text())
+            calls.append(p['stage'])
+            for trial in p['trials']:
+                cfg = trial['config']
+                assert not cfg['evaluate_test'] and cfg['phase'] == 'tune'
+                out = Path(outputs)/trial['id']
+                out.mkdir(parents=True, exist_ok=True)
+                if (out/'status.json').exists():
+                    continue
+                atomic_json(out/'config.json', cfg)
+                atomic_json(out/'status.json', dict(status='complete', tokens=cfg['total_tokens'], train_seconds=2, wall_seconds=3))
+                atomic_json(out/'metadata.json', dict(identity=dict(config_id=fingerprint(cfg), data_id=p['data_id'], sources=p['sources']), hardware=dict(device='cpu')))
+                target = dict(adamw=.001, muon=.02, shampoo=.01, kfac=.003)[cfg['optimizer']]
+                loss = 3 + abs(cfg['lr']-target)*100
+                (out/'metrics.jsonl').write_text('\n'.join(json.dumps(dict(kind='val', tokens=t, loss=l)) for t, l in
+                    [(cfg['total_tokens']//2, loss+.1), (cfg['total_tokens'], loss)])+'\n')
+                (out/'step_00000001.pt').write_bytes(b'fixture')
+            return True
+        controller_spec = short_spec | dict(data=str(data), screen_tokens=96, confirm_tokens=192,
+                                             training=spec['training'] | dict(sequence=8, accumulation=2, eval_tokens=64))
+        spec_path = root/'controller.json'
+        atomic_json(spec_path, controller_spec)
+        campaign_root = root/'campaign'
+        with patch('calibration.verify_data', return_value=manifest), patch('calibration.run_plan', side_effect=recorded_run):
+            calibrate(spec_path, campaign_root, ['cpu'])
+            assert calls == ['adamw-screen', 'adamw-expand', 'adamw-confirm', 'others-screen', 'others-expand', 'others-confirm', 'horizon']
+            assert json.loads((campaign_root/'main-study-readiness.json').read_text())['main_ready']
+            frozen = (campaign_root/'final-plan.json').read_text()
+            calibrate(spec_path, campaign_root, ['cpu'])
+            assert (campaign_root/'final-plan.json').read_text() == frozen
+            campaign = json.loads((campaign_root/'campaign.json').read_text())
+            campaign['deadline'] = 0
+            atomic_json(campaign_root/'campaign.json', campaign)
+            try:
+                calibrate(spec_path, campaign_root, ['cpu'])
+                raise AssertionError('Expired campaign silently reset its deadline')
+            except TimeoutError:
+                pass
         # Check actual checkpoint/resume for the non-default Shampoo recipe.
         c = Config(phase='verification', tiny=True, device='cpu', precision='fp32',
                    optimizer='shampoo', sequence=8, total_tokens=64, accumulation=1,

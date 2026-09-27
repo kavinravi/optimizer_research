@@ -293,6 +293,9 @@ def calibrate(spec_path, root, gpus):
             configs = candidates(spec, names, selected or None)
             plan, ranking = stage(label + "-screen", configs, spec["screen_seeds"], spec["screen_tokens"])
             screen_plans = [plan]
+            # An initial candidate below the top two cannot enter the top two
+            # when more candidates are added at the identical budget and seed.
+            prune_checkpoints(plan, results, {e["candidate"] for entries in ranking.values() for e in entries[:2]})
             # Every arm gets the same one-time wider bracket, even if its initial
             # winner was interior. No optimizer receives extra free search trials.
             extra = candidates(spec, names, selected or None, expansion=True)

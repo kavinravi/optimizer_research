@@ -1,5 +1,31 @@
 # Verification on September 25, 2026
 
+## September 26 calibration checks
+
+The bounded calibration is specified in [CALIBRATION.md](CALIBRATION.md).
+Before its launch, the existing 11-test suite passed locally with its GPU
+test skipped, then passed on ml2 with all eight architecture/optimizer CUDA
+resume cases enabled. The new `test_calibration.py` check passed locally and
+its recipe/selection/resume checks also passed on ml2. Local controller
+checks additionally exercise all seven stages, transfer of the selected
+AdamW settings to every fallback, immutable restart, deadline enforcement,
+paired-seed selection, checkpoint retention and proposed-final-plan gates.
+The isolated tmux launcher test passes with calibration mode and scratch
+cache initialization.
+
+A full-size Mamba-2 300M run exercised the new AdaGrad-grafted Shampoo recipe
+with momentum 0.9, refresh 50, fallback beta2 0.99 and fallback decay 0.01.
+It trained one update, saved, resumed, and completed the second update at
+sequence 2048, microbatch 1 and accumulation 16. The final checkpoint records
+65,536 tokens. This checks allocation and resume at the actual training
+batch; it does not establish convergence or optimal hyperparameters.
+
+The server logs are `results/calibration-self-check.log`,
+`results/calibration-gpu-check.log` and
+`results/calibration-full-size-check.log`. The full-size checkpoints and
+metrics are in `results/calibration-full-size-shampoo/`. The optimizer
+library pin is unchanged; calibration only exposes its existing settings.
+
 September 26 correction: the first pilot launch completed all eight Transformer
 runs, but all eight Mamba runs failed during import. The persistent tmux server
 had started before the scratch cache variables were exported, so Mamba's
