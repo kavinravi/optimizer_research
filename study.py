@@ -254,6 +254,7 @@ def run_plan(plan_path, results, gpus, *, hours=None, retry_failed=False):
         raise RuntimeError("Failed trials or worker errors: " + "; ".join(failures))
     print("Queue paused; rerun the same command to continue." if stopping.is_set() or not pending.empty()
           else "Queue complete.", flush=True)
+    return not stopping.is_set() and pending.empty()
 
 
 def select(plan_paths, results):

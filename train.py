@@ -42,6 +42,12 @@ class Config:
     lr: float = 3e-4
     fallback_lr: float = 3e-4
     weight_decay: float = 0.1
+    adam_beta2: float = 0.95
+    fallback_beta2: float = 0.95
+    fallback_weight_decay: float | None = None
+    momentum: float | None = None
+    shampoo_graft: str = "none"
+    shampoo_beta2: float = 0.999
     warmup_tokens: int = 1048576
     min_lr_ratio: float = 0.1
     refresh: int = 10
@@ -86,6 +92,19 @@ class Config:
                 raise ValueError(f"{name} must be finite and positive")
         if not math.isfinite(self.weight_decay) or self.weight_decay < 0:
             raise ValueError("weight_decay must be finite and nonnegative")
+        if self.fallback_weight_decay is not None and (
+                not math.isfinite(self.fallback_weight_decay) or self.fallback_weight_decay < 0):
+            raise ValueError("fallback_weight_decay must be finite and nonnegative")
+        for name in ("adam_beta2", "fallback_beta2", "shampoo_beta2"):
+            if not 0 <= getattr(self, name) < 1:
+                raise ValueError(f"{name} must be in [0, 1)")
+        if self.momentum is not None and not 0 <= self.momentum < 1:
+            raise ValueError("momentum must be in [0, 1)")
+        if self.shampoo_graft not in ("none", "sgd", "adagrad"):
+            raise ValueError("Unknown Shampoo graft")
+        if self.optimizer == "adamw" and (self.adam_beta2 != self.fallback_beta2 or
+                self.fallback_weight_decay not in (None, self.weight_decay)):
+            raise ValueError("AdamW control must use the same settings on both groups")
         if not 0 <= self.min_lr_ratio <= 1 or self.warmup_tokens >= self.total_tokens:
             raise ValueError("Invalid learning-rate schedule")
         if self.total_tokens % self.tokens_per_step:
@@ -319,7 +338,11 @@ def _train(config, data, output, resume, stop_after_steps, max_seconds):
     model.to(device).train()
     optimizer, routing = optimizer_for(model, config.optimizer, lr=config.lr,
                                        fallback_lr=config.fallback_lr, weight_decay=config.weight_decay,
-                                       refresh=config.refresh, selection=config.selection, damping=config.damping)
+                                       refresh=config.refresh, selection=config.selection, damping=config.damping,
+                                       adam_beta2=config.adam_beta2, fallback_beta2=config.fallback_beta2,
+                                       fallback_weight_decay=config.fallback_weight_decay,
+                                       momentum=config.momentum, shampoo_graft=config.shampoo_graft,
+                                       shampoo_beta2=config.shampoo_beta2)
     fisher_rng = torch.Generator(device=device).manual_seed(config.seed + 104729)
     counters = dict(step=0, tokens=0, train_seconds=0.0, eval_seconds=0.0,
                     checkpoint_seconds=0.0, best_val_loss=None, last_eval_step=-1, test_loss=None)

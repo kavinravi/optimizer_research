@@ -1,5 +1,11 @@
 # Optimizer research
 
+The current pre-main-study calibration is documented in
+[CALIBRATION.md](CALIBRATION.md), with its executable specification in
+[calibration.json](calibration.json). It screens hyperparameters, confirms
+candidates with paired seeds and measures longer curves. It does not
+automatically start the final comparison.
+
 Train Transformer and Mamba-2 language models from scratch on FineWeb-Edu at
 approximately 150M and 300M parameters. Compare AdamW, Muon, Shampoo, and
 sampled-Fisher K-FAC. SOAP is an explicit replacement if K-FAC proves

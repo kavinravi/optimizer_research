@@ -40,19 +40,24 @@ def collect(results, target=None):
         status = json.loads(status_path.read_text()) if status_path.exists() else {"status": "starting"}
         hardware = {k: metadata["hardware"].get(k) for k in
                     ("device", "name", "capability", "torch", "cuda", "versions")}
+        optimizer_fields = ("weight_decay", "adam_beta2", "momentum", "refresh", "damping",
+                            "shampoo_graft", "shampoo_beta2")
+        settings = {k: config[k] for k in optimizer_fields if k in config}
         protocol = {k: v for k, v in config.items() if k not in
-                    ("optimizer", "lr", "fallback_lr", "seed", "data_seed", "log_every", "checkpoint_every")}
+                    ("optimizer", "lr", "fallback_lr", "seed", "data_seed", "log_every", "checkpoint_every",
+                     *optimizer_fields)}
         # Checkpoint cadence affects elapsed time, so retain it in comparison identity.
         protocol["checkpoint_every"] = config["checkpoint_every"]
         comparison = dict(protocol=protocol, hardware=hardware, data_id=metadata["identity"]["data_id"],
                           sources=metadata["identity"]["sources"])
         group = fingerprint(comparison)[:12]
         comparisons[group] = comparison
-        arm = f"{config['optimizer']}-lr{config['lr']:g}-fallback{config['fallback_lr']:g}"
+        arm = f"{config['optimizer']}-lr{config['lr']:g}-fallback{config['fallback_lr']:g}-{fingerprint(settings)[:8]}"
         common = dict(comparison=group, trial=directory.name, architecture=config["architecture"],
                       size=config["size"], optimizer=config["optimizer"], phase=config["phase"],
                       seed=config["seed"], lr=config["lr"], fallback_lr=config["fallback_lr"],
-                      hardware=hardware.get("name") or hardware["device"], precision=config["precision"], arm=arm)
+                      hardware=hardware.get("name") or hardware["device"], precision=config["precision"], arm=arm,
+                      optimizer_settings=json.dumps(settings, sort_keys=True))
         metrics = rows_from(directory / "metrics.jsonl")
         validations = [r for r in metrics if r["kind"] == "val"]
         for row in validations:

@@ -86,6 +86,13 @@ if args[0] == 'new-session':
         assert args[args.index('--hours') + 1] == '0.5'
         assert '--retry-failed' in args
         assert (root / 'results/queue.exit').read_text().strip() == '7'
+        result = subprocess.run(["bash", str(root / "launch_study.sh"), "--calibrate", "plan with spaces.json", "GPU-test"],
+                                env=env, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        args = json.loads((root / "arguments.json").read_text())
+        assert 'calibration.py' in args and args[args.index('--spec') + 1] == 'plan with spaces.json'
+        assert '--retry-failed' not in args and '--hours' not in args
+        assert (root / 'results/calibration-queue.exit').read_text().strip() == '7'
         result = subprocess.run(["bash", str(root / "launch_study.sh"), "plan with spaces.json", "GPU-test"],
                                 env=dict(env, TEST_EXISTING_SESSION="1"), capture_output=True, text=True)
         assert result.returncode == 2 and 'already exists' in result.stderr
