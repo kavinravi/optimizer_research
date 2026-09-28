@@ -284,17 +284,55 @@ to the latest checkpoint, stop the queue and preserve the damaged files before
 replacing `latest.json` with `previous.json`, then retry. Checkpoints are trusted
 local PyTorch artifacts; do not load downloaded third-party pickle files.
 
-Data, logs, plans, plots and checkpoints are ignored by Git. Copy results from
-your laptop, for example after generating a report:
+Data, logs, plans, plots and checkpoints are ignored by Git. They are saved on
+ml2's disk independently of the SSH connection, but the university has not
+confirmed whether `/scratch` will be preserved during maintenance.
+
+Run this from a **local WSL/Linux terminal**, in your local repository, while
+connected to the campus network or VPN. Enter your Chapman password at the SSH
+prompt. The IP address bypasses the DNS problem; `HostKeyAlias` checks the
+previously accepted ml2 host key. Repeating the command refreshes the backup
+without deleting local files:
 
 ```bash
-scp -r kravi@ml2.chapman.edu:/scratch/kravi-optimizer.DsO74p/optimizer_research/results/report ./ml2-report
+mkdir -p results/ml2-backup/results
+rsync -aP --exclude='*.pt' --exclude='*.tmp' \
+  -e 'ssh -o HostName=10.20.157.231 -o HostKeyAlias=ml2.chapman.edu -o ServerAliveInterval=30 -o ServerAliveCountMax=3' \
+  kravi@ml2.chapman.edu:/scratch/kravi-optimizer.DsO74p/optimizer_research/results/ \
+  results/ml2-backup/results/
 ```
 
-Scratch is working storage, not a promised backup. Back up completed results
-and important checkpoints to storage approved by the university. Check `df -h
-/scratch` during longer campaigns. Stop/checkpoint before the announced October
-3–4 downtime. Close idle containers and remote editor sessions when finished.
+This copies loss/time curves, configurations, plans, rankings and logs, but
+**excludes model/optimizer checkpoints**. On September 28 these small results
+totaled about 77 MB; checkpoints totaled about 1.1 TB. A live copy can contain
+an unfinished log line or metadata from different updates. Refresh it after
+the queue has paused for a consistent final copy.
+
+For a complete recovery copy, include the retained checkpoints and prepared
+data. Check local free space first. This transfer can take many hours, so start
+it ahead of maintenance and rerun it after the queue pauses:
+
+```bash
+df -h .
+rsync -aP --exclude='*.tmp' \
+  --include='/results/***' --include='/data/***' --exclude='*' \
+  -e 'ssh -o HostName=10.20.157.231 -o HostKeyAlias=ml2.chapman.edu -o ServerAliveInterval=30 -o ServerAliveCountMax=3' \
+  kravi@ml2.chapman.edu:/scratch/kravi-optimizer.DsO74p/optimizer_research/ \
+  results/ml2-backup/
+```
+
+The first, live transfer is provisional: checkpoint files can rotate or be
+pruned during copying. Only treat the recovery copy as complete after a
+successful sync with the queue stopped. Preserve the recorded code revisions
+and software versions too; the backup is data for rebuilding the same
+environment, not a copy of the installed environment. The original resume
+command still requires the matching data, code and hardware/software stack.
+
+There is no automatic off-server backup or scheduled local transfer. Leave
+the local computer awake and connected until copying completes. Scratch is
+working storage, not a promised backup. Stop/checkpoint before the announced
+October 3-4 downtime. Close idle containers and remote editor sessions when
+finished.
 
 ## Installation and checks
 
