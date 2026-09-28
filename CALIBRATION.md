@@ -210,11 +210,31 @@ are about 260 GPU hours before accounting for the faster refresh recipes
 and additional validation/checkpoint overhead. Two GPUs imply roughly five
 to six days; the deadline can pause the campaign before it finishes.
 
-The campaign is capped at 120 hours from its first launch and must stop by
-October 2 at 00:00 Pacific, ahead of the announced October 3-4 downtime.
-Both limits are durable across restarts. It uses at most two GPU UUIDs,
-checks occupancy before every trial and takes process locks. It neither
-reserves the server nor prevents another user from starting a job.
+The initial scheduling limits were 120 hours from launch and October 2 at
+00:00 Pacific. The first limit produced an October 1, 21:03 Pacific cutoff;
+that was a compute cap, not the university's maintenance start time.
+
+September 28 scheduling amendment: retain the full screening, wider search,
+paired confirmations and longer calibration runs. Extend the current
+campaign's operational deadline to October 2 at 22:00 Pacific, assuming the
+announced October 3-4 downtime uses campus local time. This leaves a two-hour
+checkpointing buffer before October 3. An earlier confirmed maintenance start
+supersedes this assumption. If work remains when maintenance starts, preserve
+its complete resume state and continue after access returns.
+
+Record the old/new deadline, timestamp and reason in `campaign.json` under
+`deadline_changes`, with an original-manifest backup in `schedule-history/`.
+The running coordinator must checkpoint and restart to load that deadline;
+editing the file alone does not update its in-memory timer. Preserve the
+frozen specification and all source/data/plan identities. The original
+`max_hours` and `stop_before` in the launch specification remain historical
+initialization settings; this explicit operational amendment overrides them
+for this campaign. The proposed reductions discussed on September 27 were
+not adopted.
+
+The campaign uses at most two GPU UUIDs, checks occupancy before every trial
+and takes process locks. It neither reserves the server nor prevents another
+user from starting a job.
 
 Completed losing candidates release their checkpoint files after stage
 selection. Their metrics, configurations, source identities and failure logs
