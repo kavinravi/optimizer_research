@@ -91,3 +91,12 @@ The pilot queue was prepared but not launched during this setup. GPUs were
 released after verification. Tomorrow's launch must recheck availability;
 the prior idle snapshot is not a reservation. Launch and reconnect commands
 are in [README.md](README.md).
+
+## October 1 Shampoo follow-up controller
+
+`python test_shampoo_boundary.py` passed in the existing research container,
+without GPU access. Recorded trainer outputs exercise paired LR selection,
+unchanged-control reuse, replacement horizon runs only for changed winners,
+unresolved-boundary and expired-deadline stops, pause/resume, and preservation
+of the original campaign files. This checks orchestration; it does not add a
+new optimizer implementation or claim a new convergence result.

@@ -273,3 +273,68 @@ it does not start the main comparison.
 
 Charts and CSVs label optimizer recipes separately. Do not combine screening,
 confirmation and horizon losses as repeated seeds of the same experiment.
+
+## October 1 Shampoo boundary follow-up
+
+The original 368 runs finished successfully. Transformer 150M and Mamba-2
+300M selected Shampoo's lowest searched LR, `0.001 / 3`, with momentum 0.9,
+AdaGrad grafting and refresh interval 50. `shampoo_boundary.py` tests that
+same recipe at `0.001 / 9` and `0.001 / 27`. It uses the existing 67,108,864
+token confirmation budget and paired seeds 1337 and 7331: eight new runs.
+Fallback settings, model/data/code and the other optimizer selections stay
+fixed. Existing paired controls are reused without retraining.
+
+Selection uses mean terminal confirmation loss. The original longer-run
+losses do not select these LRs. If a winner is still on a search boundary,
+the follow-up stops with `needs-review`. Otherwise, each changed winner gets
+one new 268,435,456-token run with the same horizon seed 9001. Unchanged
+longer-run results are reused. These calibration seeds remain separate from
+the three proposed final seeds.
+
+This adds two paired LR candidates only to each affected arm. Report that
+extra tuning budget separately; the amended search no longer has identical
+total tuning costs across all arms. `boundary-review.json` records the added
+confirmation GPU-hours and the paired comparisons. The original campaign
+files remain unchanged. New trials use `results/calibration/runs/`; amendment
+plans, rankings, logs and the updated readiness report use
+`results/shampoo-boundary/`.
+
+The follow-up retains the campaign's October 2, 22:00 Pacific deadline and
+two-GPU limit. A checkpointed pause resumes with the same command before that
+deadline. Nothing launches the main study. Review the new readiness report
+and proposed final plan after the follow-up finishes.
+
+Prepare and validate the frozen eight-run plan on ml2:
+
+```bash
+.venv/bin/python shampoo_boundary.py --prepare-only --gpus \
+  GPU-09f93eaf-a6fa-9651-59fb-b7ddc3656f3a \
+  GPU-45699d16-5721-64f5-3624-c657bbbec7e4
+```
+
+Run in a detached tmux session after sourcing `../env.sh` in this repository.
+The runner checks GPU occupancy before each trial. An existing
+`optimizer-training` session must be inspected before attempting a new one:
+
+```bash
+tmux new-session -d -s optimizer-training -c "$PWD" bash -c '
+  source ../env.sh || exit
+  set -o pipefail
+  .venv/bin/python -u shampoo_boundary.py --gpus \
+    GPU-09f93eaf-a6fa-9651-59fb-b7ddc3656f3a \
+    GPU-45699d16-5721-64f5-3624-c657bbbec7e4 \
+    2>&1 | tee -ia results/shampoo-boundary/queue.log
+  code=${PIPESTATUS[0]}
+  printf "%s\n" "$code" > results/shampoo-boundary/queue.exit
+  exit "$code"
+'
+tmux set-option -t optimizer-training prefix C-a
+tmux set-option -t optimizer-training mouse on
+```
+
+Monitor `results/shampoo-boundary/status.json` and
+`results/shampoo-boundary/queue.log`, or attach with
+`tmux attach -r -t optimizer-training`. Completion writes updated
+`horizon-summary.csv` and `main-study-readiness.json` in the follow-up
+directory if the LR boundaries are resolved. It does not overwrite the
+original campaign's readiness report.
